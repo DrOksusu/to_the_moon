@@ -346,3 +346,4 @@ npx prisma generate
 | `S3_BUCKET_NAME` | S3 버킷 이름 | `my-bucket` |
 | `MAX_FILE_SIZE` | 최대 파일 크기 (bytes) | `10485760` (10MB) |
 | `ALLOWED_FILE_TYPES` | 허용 파일 타입 | `image/jpeg,image/png` |
+
