@@ -1,0 +1,209 @@
+import { Request, Response } from 'express';
+import prisma from '../config/database';
+
+/**
+ * 대시보드 통계 조회
+ * GET /api/dashboard/stats
+ */
+export const getDashboardStats = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        error: 'Unauthorized',
+      });
+      return;
+    }
+
+    const userId = req.user.userId;
+    const userRole = req.user.role;
+
+    // 시간이 지난 scheduled 레슨들을 자동으로 completed로 변경
+    const now = new Date();
+    const pastScheduledLessons = await prisma.lessons.findMany({
+      where: {
+        status: 'scheduled',
+        ...(userRole === 'teacher' ? { teacher_id: userId } : { student_id: userId }),
+      },
+      select: {
+        id: true,
+        scheduled_at: true,
+        duration: true,
+      },
+    });
+
+    const lessonsToComplete = pastScheduledLessons
+      .filter(lesson => {
+        const lessonEndTime = new Date(lesson.scheduled_at);
+        lessonEndTime.setMinutes(lessonEndTime.getMinutes() + lesson.duration);
+        return lessonEndTime < now;
+      })
+      .map(lesson => lesson.id);
+
+    if (lessonsToComplete.length > 0) {
+      await prisma.lessons.updateMany({
+        where: {
+          id: { in: lessonsToComplete },
+        },
+        data: {
+          status: 'completed',
+          updated_at: now,
+        },
+      });
+    }
+
+    if (userRole === 'teacher') {
+      // 선생님용 대시보드
+      const totalStudents = await prisma.student_profiles.count({
+        where: { teacher_id: userId },
+      });
+
+      // status가 'scheduled'인 모든 레슨을 예정된 레슨으로 카운트
+      // 자동 완료 로직이 실행된 후이므로, 남은 scheduled 레슨은 아직 종료되지 않은 레슨들
+      const upcomingLessons = await prisma.lessons.count({
+        where: {
+          teacher_id: userId,
+          status: 'scheduled',
+        },
+      });
+
+      // 피드백이 없는 완료된 레슨 수
+      const completedLessonsWithoutFeedback = await prisma.lessons.count({
+        where: {
+          teacher_id: userId,
+          status: 'completed',
+          feedbacks: {
+            is: null,
+          },
+        },
+      });
+
+      // 최근 학생 목록 (최근 수업 기준)
+      const recentStudents = await prisma.student_profiles.findMany({
+        where: { teacher_id: userId },
+        include: {
+          users_student_profiles_user_idTousers: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+        take: 5,
+        orderBy: {
+          updated_at: 'desc',
+        },
+      });
+
+      // 예정된 레슨 목록 (status가 'scheduled'인 모든 레슨)
+      const upcomingLessonsList = await prisma.lessons.findMany({
+        where: {
+          teacher_id: userId,
+          status: 'scheduled',
+        },
+        include: {
+          users_lessons_student_idTousers: {
+            select: {
+              name: true,
+            },
+          },
+        },
+        orderBy: {
+          scheduled_at: 'asc',
+        },
+        take: 5,
+      });
+
+      res.json({
+        total_students: totalStudents,
+        upcoming_lessons: upcomingLessons,
+        pending_feedback: completedLessonsWithoutFeedback,
+        recent_students: recentStudents.map((profile: any) => ({
+          id: profile.id,
+          name: profile.users_student_profiles_user_idTousers.name,
+          voice_type: profile.voice_type,
+          level: profile.level,
+        })),
+        upcoming_lessons_list: upcomingLessonsList.map((lesson: any) => ({
+          id: lesson.id,
+          student_name: lesson.users_lessons_student_idTousers.name,
+          scheduled_at: lesson.scheduled_at,
+          duration: lesson.duration,
+        })),
+      });
+    } else {
+      // 학생용 대시보드
+      const profile = await prisma.student_profiles.findUnique({
+        where: { user_id: userId },
+      });
+
+      // status가 'scheduled'인 모든 레슨을 예정된 레슨으로 카운트
+      // 자동 완료 로직이 실행된 후이므로, 남은 scheduled 레슨은 아직 종료되지 않은 레슨들
+      const upcomingLessons = await prisma.lessons.count({
+        where: {
+          student_id: userId,
+          status: 'scheduled',
+        },
+      });
+
+      const totalFeedback = await prisma.feedbacks.count({
+        where: { student_id: userId },
+      });
+
+      // 최근 피드백
+      const recentFeedback = await prisma.feedbacks.findMany({
+        where: { student_id: userId },
+        orderBy: { created_at: 'desc' },
+        take: 5,
+      });
+
+      // 예정된 레슨 목록 (status가 'scheduled'인 모든 레슨)
+      const upcomingLessonsList = await prisma.lessons.findMany({
+        where: {
+          student_id: userId,
+          status: 'scheduled',
+        },
+        include: {
+          users_lessons_teacher_idTousers: {
+            select: {
+              name: true,
+            },
+          },
+        },
+        orderBy: {
+          scheduled_at: 'asc',
+        },
+        take: 5,
+      });
+
+      res.json({
+        profile: {
+          voice_type: profile?.voice_type,
+          level: profile?.level,
+        },
+        upcoming_lessons: upcomingLessons,
+        total_feedback: totalFeedback,
+        recent_feedback: recentFeedback.map((feedback: any) => ({
+          id: feedback.id,
+          rating: feedback.rating,
+          content: feedback.content,
+          created_at: feedback.created_at,
+        })),
+        upcoming_lessons_list: upcomingLessonsList.map((lesson: any) => ({
+          id: lesson.id,
+          teacher_name: lesson.users_lessons_teacher_idTousers.name,
+          scheduled_at: lesson.scheduled_at,
+          duration: lesson.duration,
+          location: lesson.location,
+        })),
+      });
+    }
+  } catch (error) {
+    console.error('Get dashboard stats error:', error);
+    res.status(500).json({
+      error: 'Failed to get dashboard stats',
+    });
+  }
+};
