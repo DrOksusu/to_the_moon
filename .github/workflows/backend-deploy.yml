@@ -1,0 +1,82 @@
+name: Deploy Backend to AWS App Runner
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'to_the_moon_backend/**'
+      - '.github/workflows/backend-deploy.yml'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECR_REPOSITORY: to-the-moon-backend
+  SERVICE_NAME: to-the-moon-backend
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          mask-password: 'true'
+
+      - name: Build, tag, and push image to Amazon ECR
+        working-directory: ./to_the_moon_backend
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      - name: Deploy to App Runner
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          echo "Image pushed: $ECR_REGISTRY/$ECR_REPOSITORY:latest"
+
+          SERVICE_ARN=$(aws apprunner list-services --region $AWS_REGION \
+            --query "ServiceSummaryList[?ServiceName=='$SERVICE_NAME'].ServiceArn" \
+            --output text)
+
+          if [ -n "$SERVICE_ARN" ] && [ "$SERVICE_ARN" != "None" ]; then
+            echo "Triggering deployment for: $SERVICE_ARN"
+
+            for i in {1..20}; do
+              STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" \
+                --region $AWS_REGION --query "Service.Status" --output text)
+              echo "Status: $STATUS"
+
+              if [ "$STATUS" = "RUNNING" ]; then
+                aws apprunner start-deployment --service-arn "$SERVICE_ARN" --region $AWS_REGION
+                echo "Deployment triggered!"
+                exit 0
+              fi
+              echo "Waiting... ($i/20)"
+              sleep 30
+            done
+            echo "Timeout waiting for RUNNING state"
+            exit 1
+          else
+            echo "App Runner service '$SERVICE_NAME' not found"
+            exit 1
+          fi
