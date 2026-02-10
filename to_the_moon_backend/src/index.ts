@@ -1,4 +1,12 @@
-// Debug: Log environment variables before anything else
+// Load environment variables BEFORE any other imports
+import dotenv from 'dotenv';
+import path from 'path';
+
+const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env';
+dotenv.config({ path: path.resolve(__dirname, '..', envFile) });
+console.log(`✓ Loaded env from: ${envFile}`);
+
+// Debug: Log environment variables after dotenv loads
 console.log('========== ENVIRONMENT DEBUG ==========');
 console.log('NODE_ENV:', process.env.NODE_ENV);
 console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'SET' : 'NOT SET');

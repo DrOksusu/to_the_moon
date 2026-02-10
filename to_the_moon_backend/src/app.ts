@@ -3,15 +3,7 @@ import cors from 'cors';
 import routes from './routes';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 
-// Load environment variables (only in development)
-// In production (App Runner), environment variables are injected automatically
-if (process.env.NODE_ENV !== 'production') {
-  const dotenv = require('dotenv');
-  dotenv.config();
-  console.log('Development mode: loaded .env file');
-} else {
-  console.log('Production mode: using injected environment variables');
-}
+// dotenv는 index.ts에서 최초 로드됨 (환경별 .env 파일 자동 선택)
 
 const app: Application = express();
 
