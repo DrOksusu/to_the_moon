@@ -105,6 +105,7 @@ export default function AddFeedbackPage({
     created_at: string
     meta: StickerMeta
   } | null>(null)
+  const [isEditingSticker, setIsEditingSticker] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -182,25 +183,38 @@ export default function AddFeedbackPage({
         await api.post('/feedback', feedbackData)
       }
 
-      // 스티커 발행
+      // 스티커 발행 또는 수정
       if (selectedSticker && lesson?.student_id) {
         try {
-          await api.post('/stickers', {
-            student_id: lesson.student_id,
-            level: selectedSticker,
-            comment: stickerComment || null,
-            lesson_id: resolvedParams.id,
-          })
           const stickerMeta = STICKER_LEVELS.find(s => s.level === selectedSticker)
-          toast({
-            title: '성공',
-            description: `피드백이 ${existingFeedback ? '수정' : '등록'}되었습니다. ${stickerMeta?.emoji} ${stickerMeta?.name} 스티커도 발행했습니다!`,
-          })
+          if (existingSticker && isEditingSticker) {
+            // 기존 스티커 수정
+            await api.patch(`/stickers/${existingSticker.id}`, {
+              level: selectedSticker,
+              comment: stickerComment || null,
+            })
+            toast({
+              title: '성공',
+              description: `피드백이 수정되었습니다. ${stickerMeta?.emoji} ${stickerMeta?.name} 스티커도 변경했습니다!`,
+            })
+          } else {
+            // 새 스티커 발행
+            await api.post('/stickers', {
+              student_id: lesson.student_id,
+              level: selectedSticker,
+              comment: stickerComment || null,
+              lesson_id: resolvedParams.id,
+            })
+            toast({
+              title: '성공',
+              description: `피드백이 ${existingFeedback ? '수정' : '등록'}되었습니다. ${stickerMeta?.emoji} ${stickerMeta?.name} 스티커도 발행했습니다!`,
+            })
+          }
         } catch (stickerError) {
-          console.error('Sticker creation failed:', stickerError)
+          console.error('Sticker save failed:', stickerError)
           toast({
             title: '부분 성공',
-            description: `피드백은 ${existingFeedback ? '수정' : '등록'}되었지만, 스티커 발행에 실패했습니다.`,
+            description: `피드백은 ${existingFeedback ? '수정' : '등록'}되었지만, 스티커 저장에 실패했습니다.`,
             variant: 'destructive',
           })
         }
@@ -383,7 +397,7 @@ export default function AddFeedbackPage({
                   레벨 스티커
                 </Label>
 
-                {existingSticker ? (
+                {existingSticker && !isEditingSticker ? (
                   /* 이미 발행된 스티커 표시 */
                   <div className="p-4 rounded-lg bg-amber-50/50 border border-amber-200">
                     <div className="flex items-center gap-3">
@@ -401,14 +415,44 @@ export default function AddFeedbackPage({
                           {new Date(existingSticker.created_at).toLocaleString('ko-KR')}
                         </p>
                       </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setIsEditingSticker(true)
+                          setSelectedSticker(existingSticker.level)
+                          setStickerComment(existingSticker.comment || '')
+                        }}
+                      >
+                        변경
+                      </Button>
                     </div>
                   </div>
                 ) : (
-                  /* 새 스티커 발행 UI */
+                  /* 새 스티커 발행 또는 수정 UI */
                   <>
-                    <p className="text-sm text-muted-foreground">
-                      이 레슨에 대해 학생에게 스티커를 줄 수 있어요 (선택)
-                    </p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-muted-foreground">
+                        {isEditingSticker
+                          ? '스티커를 변경할 수 있습니다'
+                          : '이 레슨에 대해 학생에게 스티커를 줄 수 있어요 (선택)'}
+                      </p>
+                      {isEditingSticker && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setIsEditingSticker(false)
+                            setSelectedSticker(null)
+                            setStickerComment('')
+                          }}
+                        >
+                          취소
+                        </Button>
+                      )}
+                    </div>
 
                     {/* 스티커 레벨 선택 */}
                     <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
@@ -442,7 +486,7 @@ export default function AddFeedbackPage({
                           <span className="text-lg">
                             {STICKER_LEVELS.find(s => s.level === selectedSticker)?.emoji}
                           </span>
-                          {STICKER_LEVELS.find(s => s.level === selectedSticker)?.name} 스티커 선택됨
+                          {STICKER_LEVELS.find(s => s.level === selectedSticker)?.name} 스티커 {isEditingSticker ? '변경됨' : '선택됨'}
                         </div>
                         <Input
                           value={stickerComment}

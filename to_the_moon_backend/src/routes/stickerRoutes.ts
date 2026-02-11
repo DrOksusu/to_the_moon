@@ -3,6 +3,7 @@ import {
   createSticker,
   getStickers,
   getStickerStats,
+  updateSticker,
   deleteSticker,
   getStickerLevels,
 } from '../controllers/stickerController';
@@ -24,6 +25,9 @@ router.get('/', getStickers);
 
 // 스티커 발행 (선생님 전용)
 router.post('/', createSticker);
+
+// 스티커 수정 (선생님 전용)
+router.patch('/:id', updateSticker);
 
 // 스티커 삭제 (선생님 전용)
 router.delete('/:id', deleteSticker);

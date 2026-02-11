@@ -215,6 +215,69 @@ export const getStickerStats = async (
 };
 
 /**
+ * 스티커 수정 (선생님 전용 - 본인이 발행한 것만)
+ * PATCH /api/stickers/:id
+ */
+export const updateSticker = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    if (req.user.role !== 'teacher') {
+      res.status(403).json({ error: '선생님만 스티커를 수정할 수 있습니다.' });
+      return;
+    }
+
+    const { id } = req.params;
+    const { level, comment } = req.body;
+
+    const sticker = await prisma.stickers.findUnique({
+      where: { id },
+    });
+
+    if (!sticker) {
+      res.status(404).json({ error: '스티커를 찾을 수 없습니다.' });
+      return;
+    }
+
+    if (sticker.teacher_id !== req.user.userId) {
+      res.status(403).json({ error: '본인이 발행한 스티커만 수정할 수 있습니다.' });
+      return;
+    }
+
+    if (level && !STICKER_LEVELS[level as sticker_level]) {
+      res.status(400).json({ error: '유효하지 않은 스티커 레벨입니다.' });
+      return;
+    }
+
+    const updated = await prisma.stickers.update({
+      where: { id },
+      data: {
+        ...(level && { level: level as sticker_level }),
+        ...(comment !== undefined && { comment: comment || null }),
+      },
+      include: {
+        student: {
+          select: { id: true, name: true },
+        },
+      },
+    });
+
+    const meta = STICKER_LEVELS[updated.level];
+
+    res.json({ ...updated, meta });
+  } catch (error) {
+    console.error('Update sticker error:', error);
+    res.status(500).json({ error: '스티커 수정에 실패했습니다.' });
+  }
+};
+
+/**
  * 스티커 삭제 (선생님 전용 - 본인이 발행한 것만)
  * DELETE /api/stickers/:id
  */
