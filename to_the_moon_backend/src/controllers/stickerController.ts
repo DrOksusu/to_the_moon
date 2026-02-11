@@ -94,7 +94,7 @@ export const getStickers = async (
       return;
     }
 
-    const { student_id, limit, offset } = req.query;
+    const { student_id, lesson_id, limit, offset } = req.query;
     const userId = req.user.userId;
     const userRole = req.user.role;
 
@@ -108,6 +108,10 @@ export const getStickers = async (
     } else {
       // 학생은 본인 스티커만 조회
       where.student_id = userId;
+    }
+
+    if (lesson_id) {
+      where.lesson_id = lesson_id as string;
     }
 
     const stickers = await prisma.stickers.findMany({

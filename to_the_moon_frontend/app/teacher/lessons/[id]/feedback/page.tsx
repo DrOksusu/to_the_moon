@@ -98,6 +98,13 @@ export default function AddFeedbackPage({
   const [newUrl, setNewUrl] = useState('')
   const [selectedSticker, setSelectedSticker] = useState<string | null>(null)
   const [stickerComment, setStickerComment] = useState('')
+  const [existingSticker, setExistingSticker] = useState<{
+    id: string
+    level: string
+    comment?: string
+    created_at: string
+    meta: StickerMeta
+  } | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -121,6 +128,16 @@ export default function AddFeedbackPage({
         } catch (error) {
           // No existing feedback, that's okay
           console.log('No existing feedback')
+        }
+
+        // Fetch existing sticker for this lesson
+        try {
+          const stickers = await api.get<any[]>(`/stickers?lesson_id=${resolvedParams.id}`)
+          if (stickers.length > 0) {
+            setExistingSticker(stickers[0])
+          }
+        } catch (error) {
+          console.log('No existing sticker')
         }
       } catch (error) {
         console.error('Failed to fetch lesson:', error)
@@ -363,54 +380,80 @@ export default function AddFeedbackPage({
               <div className="space-y-4">
                 <Label className="text-amber-600 flex items-center gap-2">
                   <Sparkles className="h-4 w-4" />
-                  레벨 스티커 발행
+                  레벨 스티커
                 </Label>
-                <p className="text-sm text-muted-foreground">
-                  오늘 레슨에 대해 학생에게 스티커를 줄 수 있어요 (선택)
-                </p>
 
-                {/* 스티커 레벨 선택 */}
-                <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
-                  {STICKER_LEVELS.map((sticker) => (
-                    <button
-                      key={sticker.level}
-                      type="button"
-                      onClick={() =>
-                        setSelectedSticker(
-                          selectedSticker === sticker.level ? null : sticker.level
-                        )
-                      }
-                      className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all ${
-                        selectedSticker === sticker.level
-                          ? 'border-amber-400 bg-amber-50 shadow-md scale-105'
-                          : 'border-muted hover:border-amber-200 hover:bg-amber-50/50'
-                      }`}
-                    >
-                      <span className="text-2xl">{sticker.emoji}</span>
-                      <span className="text-[10px] font-medium leading-tight text-center">
-                        {sticker.name}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-
-                {/* 선택된 스티커 코멘트 입력 */}
-                {selectedSticker && (
-                  <div className="space-y-2 p-4 rounded-lg bg-amber-50/50 border border-amber-200">
-                    <div className="flex items-center gap-2 text-sm font-medium text-amber-700">
-                      <span className="text-lg">
-                        {STICKER_LEVELS.find(s => s.level === selectedSticker)?.emoji}
-                      </span>
-                      {STICKER_LEVELS.find(s => s.level === selectedSticker)?.name} 스티커 선택됨
+                {existingSticker ? (
+                  /* 이미 발행된 스티커 표시 */
+                  <div className="p-4 rounded-lg bg-amber-50/50 border border-amber-200">
+                    <div className="flex items-center gap-3">
+                      <span className="text-3xl">{existingSticker.meta.emoji}</span>
+                      <div className="flex-1">
+                        <div className="font-medium text-amber-800">
+                          {existingSticker.meta.name} 스티커 발행됨
+                        </div>
+                        {existingSticker.comment && (
+                          <p className="text-sm text-amber-700 mt-0.5">
+                            &ldquo;{existingSticker.comment}&rdquo;
+                          </p>
+                        )}
+                        <p className="text-xs text-amber-600 mt-1">
+                          {new Date(existingSticker.created_at).toLocaleString('ko-KR')}
+                        </p>
+                      </div>
                     </div>
-                    <Input
-                      value={stickerComment}
-                      onChange={(e) => setStickerComment(e.target.value)}
-                      placeholder="한줄 코멘트 (선택) - 예: 오늘 고음 완벽했어!"
-                      maxLength={200}
-                      className="bg-white"
-                    />
                   </div>
+                ) : (
+                  /* 새 스티커 발행 UI */
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      이 레슨에 대해 학생에게 스티커를 줄 수 있어요 (선택)
+                    </p>
+
+                    {/* 스티커 레벨 선택 */}
+                    <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                      {STICKER_LEVELS.map((sticker) => (
+                        <button
+                          key={sticker.level}
+                          type="button"
+                          onClick={() =>
+                            setSelectedSticker(
+                              selectedSticker === sticker.level ? null : sticker.level
+                            )
+                          }
+                          className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all ${
+                            selectedSticker === sticker.level
+                              ? 'border-amber-400 bg-amber-50 shadow-md scale-105'
+                              : 'border-muted hover:border-amber-200 hover:bg-amber-50/50'
+                          }`}
+                        >
+                          <span className="text-2xl">{sticker.emoji}</span>
+                          <span className="text-[10px] font-medium leading-tight text-center">
+                            {sticker.name}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* 선택된 스티커 코멘트 입력 */}
+                    {selectedSticker && (
+                      <div className="space-y-2 p-4 rounded-lg bg-amber-50/50 border border-amber-200">
+                        <div className="flex items-center gap-2 text-sm font-medium text-amber-700">
+                          <span className="text-lg">
+                            {STICKER_LEVELS.find(s => s.level === selectedSticker)?.emoji}
+                          </span>
+                          {STICKER_LEVELS.find(s => s.level === selectedSticker)?.name} 스티커 선택됨
+                        </div>
+                        <Input
+                          value={stickerComment}
+                          onChange={(e) => setStickerComment(e.target.value)}
+                          placeholder="한줄 코멘트 (선택) - 예: 오늘 고음 완벽했어!"
+                          maxLength={200}
+                          className="bg-white"
+                        />
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
