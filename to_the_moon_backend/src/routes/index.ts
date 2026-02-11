@@ -10,6 +10,7 @@ import studentDashboardRoutes from './studentDashboardRoutes';
 import adminRoutes from './adminRoutes';
 import notificationRoutes from './notificationRoutes';
 import announcementRoutes, { studentAnnouncementRouter } from './announcementRoutes';
+import stickerRoutes from './stickerRoutes';
 
 const router = Router();
 
@@ -36,5 +37,6 @@ router.use('/student', studentDashboardRoutes);
 router.use('/student/announcements', studentAnnouncementRouter);
 router.use('/notifications', notificationRoutes);
 router.use('/announcements', announcementRoutes);
+router.use('/stickers', stickerRoutes);
 
 export default router;

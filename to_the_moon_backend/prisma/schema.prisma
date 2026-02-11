@@ -68,6 +68,7 @@ model lessons {
   users_lessons_student_idTousers users           @relation("lessons_student_idTousers", fields: [student_id], references: [id], onDelete: Cascade)
   users_lessons_teacher_idTousers users           @relation("lessons_teacher_idTousers", fields: [teacher_id], references: [id], onDelete: Cascade)
   notifications                   notifications[]
+  stickers                        stickers[]
 
   @@index([scheduled_at])
   @@index([status])
@@ -136,6 +137,8 @@ model users {
   student_profiles_student_profiles_user_idTousers    student_profiles?           @relation("student_profiles_user_idTousers")
   announcements_teacher                               announcements[]             @relation("announcements_teacher")
   announcement_reads_student                          announcement_reads[]        @relation("announcement_reads_student")
+  stickers_teacher                                    stickers[]                  @relation("stickers_teacher_idTousers")
+  stickers_student                                    stickers[]                  @relation("stickers_student_idTousers")
 
   @@index([email])
   @@index([role])
@@ -179,6 +182,16 @@ enum notification_type {
   feedback_received
 }
 
+enum sticker_level {
+  seed
+  bloom
+  shooting_star
+  rocket
+  satellite
+  aurora
+  to_the_moon
+}
+
 model announcements {
   id          String   @id
   teacher_id  String
@@ -206,4 +219,24 @@ model announcement_reads {
 
   @@unique([announcement_id, student_id])
   @@index([student_id])
+}
+
+model stickers {
+  id          String        @id
+  teacher_id  String
+  student_id  String
+  level       sticker_level
+  comment     String?       @db.VarChar(200)
+  lesson_id   String?
+  created_at  DateTime      @default(now())
+
+  teacher users    @relation("stickers_teacher_idTousers", fields: [teacher_id], references: [id], onDelete: Cascade)
+  student users    @relation("stickers_student_idTousers", fields: [student_id], references: [id], onDelete: Cascade)
+  lesson  lessons? @relation(fields: [lesson_id], references: [id], onDelete: SetNull)
+
+  @@index([teacher_id])
+  @@index([student_id])
+  @@index([student_id, level])
+  @@index([lesson_id])
+  @@index([created_at])
 }

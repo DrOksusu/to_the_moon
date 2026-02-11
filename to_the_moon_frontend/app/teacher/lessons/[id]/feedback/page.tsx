@@ -9,9 +9,27 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { TeacherNav } from '@/components/teacher/teacher-nav'
-import { Star, Calendar, Clock, Youtube, Plus, X, MessageCircle, Heart } from 'lucide-react'
+import { Star, Calendar, Clock, Youtube, Plus, X, MessageCircle, Heart, Sparkles } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
+
+interface StickerMeta {
+  level: string
+  order: number
+  name: string
+  emoji: string
+  points: number
+}
+
+const STICKER_LEVELS: StickerMeta[] = [
+  { level: 'seed', order: 1, name: '씨앗', emoji: '🌱', points: 10 },
+  { level: 'bloom', order: 2, name: '꽃봉오리', emoji: '🌸', points: 20 },
+  { level: 'shooting_star', order: 3, name: '별똥별', emoji: '🌠', points: 30 },
+  { level: 'rocket', order: 4, name: '로켓', emoji: '🚀', points: 50 },
+  { level: 'satellite', order: 5, name: '위성', emoji: '🛰️', points: 70 },
+  { level: 'aurora', order: 6, name: '오로라', emoji: '🌌', points: 85 },
+  { level: 'to_the_moon', order: 7, name: '투더문', emoji: '🌕', points: 100 },
+]
 
 interface Lesson {
   id: string
@@ -78,6 +96,8 @@ export default function AddFeedbackPage({
   const [rating, setRating] = useState<string>('5')
   const [referenceUrls, setReferenceUrls] = useState<string[]>([''])
   const [newUrl, setNewUrl] = useState('')
+  const [selectedSticker, setSelectedSticker] = useState<string | null>(null)
+  const [stickerComment, setStickerComment] = useState('')
 
   useEffect(() => {
     const fetchData = async () => {
@@ -141,15 +161,36 @@ export default function AddFeedbackPage({
     try {
       if (existingFeedback) {
         await api.put(`/feedback/${existingFeedback.id}`, feedbackData)
-        toast({
-          title: '성공',
-          description: '피드백이 수정되었습니다',
-        })
       } else {
         await api.post('/feedback', feedbackData)
+      }
+
+      // 스티커 발행
+      if (selectedSticker && lesson?.student_id) {
+        try {
+          await api.post('/stickers', {
+            student_id: lesson.student_id,
+            level: selectedSticker,
+            comment: stickerComment || null,
+            lesson_id: resolvedParams.id,
+          })
+          const stickerMeta = STICKER_LEVELS.find(s => s.level === selectedSticker)
+          toast({
+            title: '성공',
+            description: `피드백이 ${existingFeedback ? '수정' : '등록'}되었습니다. ${stickerMeta?.emoji} ${stickerMeta?.name} 스티커도 발행했습니다!`,
+          })
+        } catch (stickerError) {
+          console.error('Sticker creation failed:', stickerError)
+          toast({
+            title: '부분 성공',
+            description: `피드백은 ${existingFeedback ? '수정' : '등록'}되었지만, 스티커 발행에 실패했습니다.`,
+            variant: 'destructive',
+          })
+        }
+      } else {
         toast({
           title: '성공',
-          description: '피드백이 등록되었습니다',
+          description: `피드백이 ${existingFeedback ? '수정' : '등록'}되었습니다`,
         })
       }
 
@@ -316,6 +357,61 @@ export default function AddFeedbackPage({
                   rows={4}
                   defaultValue={existingFeedback?.homework}
                 />
+              </div>
+
+              {/* 스티커 발행 섹션 */}
+              <div className="space-y-4">
+                <Label className="text-amber-600 flex items-center gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  레벨 스티커 발행
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  오늘 레슨에 대해 학생에게 스티커를 줄 수 있어요 (선택)
+                </p>
+
+                {/* 스티커 레벨 선택 */}
+                <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                  {STICKER_LEVELS.map((sticker) => (
+                    <button
+                      key={sticker.level}
+                      type="button"
+                      onClick={() =>
+                        setSelectedSticker(
+                          selectedSticker === sticker.level ? null : sticker.level
+                        )
+                      }
+                      className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all ${
+                        selectedSticker === sticker.level
+                          ? 'border-amber-400 bg-amber-50 shadow-md scale-105'
+                          : 'border-muted hover:border-amber-200 hover:bg-amber-50/50'
+                      }`}
+                    >
+                      <span className="text-2xl">{sticker.emoji}</span>
+                      <span className="text-[10px] font-medium leading-tight text-center">
+                        {sticker.name}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* 선택된 스티커 코멘트 입력 */}
+                {selectedSticker && (
+                  <div className="space-y-2 p-4 rounded-lg bg-amber-50/50 border border-amber-200">
+                    <div className="flex items-center gap-2 text-sm font-medium text-amber-700">
+                      <span className="text-lg">
+                        {STICKER_LEVELS.find(s => s.level === selectedSticker)?.emoji}
+                      </span>
+                      {STICKER_LEVELS.find(s => s.level === selectedSticker)?.name} 스티커 선택됨
+                    </div>
+                    <Input
+                      value={stickerComment}
+                      onChange={(e) => setStickerComment(e.target.value)}
+                      placeholder="한줄 코멘트 (선택) - 예: 오늘 고음 완벽했어!"
+                      maxLength={200}
+                      className="bg-white"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="space-y-4">
