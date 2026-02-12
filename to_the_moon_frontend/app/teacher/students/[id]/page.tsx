@@ -257,13 +257,13 @@ export default function StudentProfilePage() {
     <div className="min-h-screen bg-background">
       <TeacherNav />
 
-      <main className="container mx-auto p-6 max-w-5xl space-y-6">
+      <main className="container mx-auto px-4 py-6 sm:px-6 max-w-5xl space-y-6">
         <Card>
           <CardHeader>
-            <div className="flex items-start justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
               <div className="space-y-1">
                 <CardTitle className="text-2xl">{profile.user.name}</CardTitle>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <Mail className="h-3 w-3" />
                     {profile.user.email}
@@ -277,13 +277,14 @@ export default function StudentProfilePage() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button asChild>
+                <Button asChild size="sm">
                   <Link href={`/teacher/lessons/new?student=${profile.id}`}>
                     수업 등록
                   </Link>
                 </Button>
                 <Button
                   variant="destructive"
+                  size="sm"
                   onClick={handleDeleteStudent}
                   disabled={deleting}
                 >
@@ -294,7 +295,7 @@ export default function StudentProfilePage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
               <div className="flex items-center gap-3">
                 <Music className="h-5 w-5 text-muted-foreground" />
                 <div>
@@ -314,7 +315,7 @@ export default function StudentProfilePage() {
                 <div>
                   <div className="text-xs text-muted-foreground">시작일</div>
                   <div className="font-medium">
-                    {new Date(profile.start_date).toLocaleDateString('ko-KR')}
+                    {profile.start_date ? new Date(profile.start_date).toLocaleDateString('ko-KR') : '-'}
                   </div>
                 </div>
               </div>
